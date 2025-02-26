@@ -4,7 +4,7 @@ import java.net.URL;
 import org.json.JSONObject;
 
 public class GeminiAPIClient {
-    private static final String API_KEY = System.getenv("AIzaSyB3ObgBe9TCNzc7ZBAfK4lF_sDsSwC8NZ8");
+    private static final String API_KEY = System.getenv("API KEY");
     private static final String API_URL = "https://generativelanguage.googleapis.com/v1/models/gemini-2.0-flash:generateContent";
 
     public static void main(String[] args) {
