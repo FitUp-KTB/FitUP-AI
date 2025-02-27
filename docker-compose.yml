@@ -1,0 +1,11 @@
+version: "3.8"
+
+services:
+  fastapi-app:
+    image: ${DOCKER_HUB_USERNAME}/fastapi-rag:latest
+    container_name: fastapi-rag
+    ports:
+      - "8000:8000"
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+    restart: always

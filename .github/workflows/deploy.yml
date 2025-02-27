@@ -1,0 +1,53 @@
+name: CI/CD Pipeline for FastAPI Deployment
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build_and_push:
+    name: Build and Push Docker Image (CI)
+    runs-on: self-hosted
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+      
+      - name: Log in to Docker Hub
+        run: echo "${{ secrets.DOCKER_HUB_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_HUB_USERNAME }}" --password-stdin
+      
+      - name: Build Docker image
+        run: docker build -t ${{ secrets.DOCKER_HUB_USERNAME }}/fastapi-rag:latest .
+      
+      - name: Push Docker image
+        run: docker push ${{ secrets.DOCKER_HUB_USERNAME }}/fastapi-rag:latest
+
+  deploy:
+    name: Deploy with Docker Compose (CD)
+    needs: build_and_push
+    strategy:
+      matrix:
+        runner_label:
+          - server1
+          - server2
+    runs-on:
+      - self-hosted
+      - '${{ matrix.runner_label }}'
+    env:
+      DOCKER_HUB_USERNAME: ${{ secrets.DOCKER_HUB_USERNAME }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Stop and remove old containers
+        run: docker-compose down || true
+
+      - name: Remove unused Docker images
+        run: docker image prune -f
+
+      - name: Deploy with Docker Compose
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          docker-compose pull
+          docker-compose up -d
