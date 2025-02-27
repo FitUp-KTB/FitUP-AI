@@ -238,6 +238,8 @@ endurance: 팔굽혀펴기, 윗몸일으키기 횟수를 기반으로 계산 많
 
 speed: 달리기 페이스를 기반으로 숫자가 낮을수록 높은 점수를 얻습니다. 
 
+flexibility : 기본으로 50 값으로설절됩니다. 
+
 stamina: 달리기 시간을 기반으로 계산되었습니다. 오래 달릴수록 높은 점수를 얻습니다. 또한 endurance점수와 speed점수를 합산하여 반영합니다. 
 
 character_type: strength, endurance, speed, flexibility, stamina 점수를 종합적으로 고려하여 판단 (높다는 기준은 다른 스탯 평균보다 20%이상 수치를 가질때)
@@ -293,6 +295,7 @@ endurance	팔굽혀펴기 & 윗몸일으키기 반복 횟수가 많음
   "strength": <strength>,
   "endurance": <endurance>,
   "speed": <speed>,
+  "flexibility": <flexibility>,
   "stamina": <stamina>,
   "character_type": "power"
 }}
