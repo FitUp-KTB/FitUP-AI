@@ -1,13 +1,13 @@
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
-from langchain.llms import OpenAI
-from langchain.embeddings import OpenAIEmbeddings
-from langchain.vectorstores import FAISS
-from langchain.chains import LLMChain
-from langchain.prompts import PromptTemplate
+import os
+import google.generativeai as genai
 from dotenv import load_dotenv
 
 load_dotenv()
+
+# Google Gemini API 키 설정
+genai.configure(api_key=os.getenv("GOOGLE_GEMINI_API_KEY"))
 
 app = FastAPI()
 
@@ -22,25 +22,8 @@ class QuestInput(BaseModel):
     user_request: str
     goal: str
 
-# 예시 기존 기록 (실제 서비스에서는 DB에서 관리)
-documents = [
-    "스쿼트 80kg 5세트 수행",
-    "레그 익스텐션 50kg 5세트",
-    "레그프레스 160kg 5세트",
-    "수면 8시간 유지",
-    "아침 공복에 물 500ml 마시기"
-]
-
-# 임베딩 및 FAISS 벡터 DB 초기화
-embeddings = OpenAIEmbeddings()
-vector_store = FAISS.from_texts(documents, embeddings)
-retriever = vector_store.as_retriever(search_kwargs={"k": 3})
-
-# LLM 초기화 (환경 변수 OPENAI_API_KEY는 .env에서 로드)
-llm = OpenAI(temperature=0)
-
-# 퀘스트 생성 프롬프트 템플릿 (출력 JSON 예시 중괄호 이스케이프 처리)
-quest_prompt_str = """
+# Google Gemini LLM을 사용하여 퀘스트 생성
+quest_prompt_template = """
 너는 사람들의 운동을 돕는 게임 기반의 퀘스트 생성 시스템이야.
 입력 데이터는 아래 JSON 형식으로 주어진다:
 {input_data}
@@ -52,7 +35,7 @@ quest_prompt_str = """
 {retrieved_records}
 
 추가로, 너는 RAG를 사용해서 검색된 기존 기록(예: 이전 퀘스트 수행 내역 등)을 참고 자료로 활용할 거야.
-이 검색된 기록은 퀘스트 생성 시, 목표(goal) 및 참고 사항으로만 사용돼.
+이 검색된 기록은 퀘스트 생성 시, 목표(goal) 및 참고 사항으로만 사용돼. 꼭 검색 기록에서만 퀘스트를 만들 필요 없이 내용이 부족한거같으면 너가 생성해줘도 돼
 
 [규칙]
 1. daily_quests의 daily:
@@ -86,23 +69,17 @@ quest_prompt_str = """
 반드시 JSON 형식만 출력해줘.
 """
 
-quest_prompt_template = PromptTemplate(
-    input_variables=["input_data", "user_request", "retrieved_records"],
-    template=quest_prompt_str,
-)
-
-quest_llm_chain = LLMChain(llm=llm, prompt=quest_prompt_template)
-
 @app.post("/query")
 async def query_endpoint(input_data: QuestInput):
-    retrieved_docs = retriever.get_relevant_documents(input_data.user_request)
-    retrieved_records_text = " ".join([doc.page_content for doc in retrieved_docs])
-    final_output = quest_llm_chain.run({
-        "input_data": str(input_data.dict()),
-        "user_request": input_data.user_request,
-        "retrieved_records": retrieved_records_text
-    })
-    return final_output
+    model = genai.GenerativeModel("gemini-1.5-flash")
+    response = model.generate_content(
+        quest_prompt_template.format(
+            input_data=input_data.dict(),
+            user_request=input_data.user_request,
+            retrieved_records="(추후 데이터베이스 연동 예정)"
+        )
+    )
+    return response.text
 
 ### 2. 헬스케어 스펙 계산 관련 코드 ###
 class HealthInput(BaseModel):
@@ -121,7 +98,7 @@ class HealthInput(BaseModel):
     bench_press: float = None
     deadlift: float = None
 
-stats_prompt_str = """
+stats_prompt_template = """
 너의 역할은 게임기반 헬스케어 서비스를 관리하는 시스템이야
 기능은 신체 스펙 데이터와 운동 수행능력 데이터를 받아서 스펙으로 반환해줄거야 
 데이터 형식은 다음과 같아
@@ -212,16 +189,11 @@ endurance	팔굽혀펴기 & 윗몸일으키기 반복 횟수가 많음
 모든 출력은 JSON만 반환해줘
 """
 
-stats_prompt_template = PromptTemplate(
-    input_variables=["input_data"],
-    template=stats_prompt_str,
-)
-
-stats_llm_chain = LLMChain(llm=llm, prompt=stats_prompt_template)
 
 @app.post("/stats")
 async def compute_stats(input_data: HealthInput):
-    final_output = stats_llm_chain.run({
-        "input_data": str(input_data.dict())
-    })
-    return final_output
+    model = genai.GenerativeModel("gemini-pro")
+    response = model.generate_content(
+        stats_prompt_template.format(input_data=input_data.dict())
+    )
+    return response.text
