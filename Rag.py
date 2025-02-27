@@ -11,8 +11,8 @@ load_dotenv()
 
 app = FastAPI()
 
-# 사용자 입력 모델 정의
-class UserInput(BaseModel):
+### 1. 퀘스트 생성 관련 코드 ###
+class QuestInput(BaseModel):
     user_id: str
     gender: str
     chronic: str
@@ -36,11 +36,11 @@ embeddings = OpenAIEmbeddings()
 vector_store = FAISS.from_texts(documents, embeddings)
 retriever = vector_store.as_retriever(search_kwargs={"k": 3})
 
-# LLM 초기화 (OPENAI_API_KEY는 .env 파일에서 로드)
+# LLM 초기화 (환경 변수 OPENAI_API_KEY는 .env에서 로드)
 llm = OpenAI(temperature=0)
 
-# JSON 포맷 출력 위한 프롬프트 템플릿 (출력 예시의 중괄호는 이스케이프 처리)
-prompt_template_str = """
+# 퀘스트 생성 프롬프트 템플릿 (출력 JSON 예시 중괄호 이스케이프 처리)
+quest_prompt_str = """
 너는 사람들의 운동을 돕는 게임 기반의 퀘스트 생성 시스템이야.
 입력 데이터는 아래 JSON 형식으로 주어진다:
 {input_data}
@@ -86,24 +86,142 @@ prompt_template_str = """
 반드시 JSON 형식만 출력해줘.
 """
 
-prompt_template = PromptTemplate(
+quest_prompt_template = PromptTemplate(
     input_variables=["input_data", "user_request", "retrieved_records"],
-    template=prompt_template_str,
+    template=quest_prompt_str,
 )
 
-llm_chain = LLMChain(llm=llm, prompt=prompt_template)
+quest_llm_chain = LLMChain(llm=llm, prompt=quest_prompt_template)
 
 @app.post("/query")
-async def query_endpoint(input_data: UserInput):
-    # 사용자 요청에 따른 관련 문서 검색
+async def query_endpoint(input_data: QuestInput):
     retrieved_docs = retriever.get_relevant_documents(input_data.user_request)
     retrieved_records_text = " ".join([doc.page_content for doc in retrieved_docs])
-    
-    # LangChain 체인을 통해 최종 JSON 생성
-    final_output = llm_chain.run({
+    final_output = quest_llm_chain.run({
         "input_data": str(input_data.dict()),
         "user_request": input_data.user_request,
         "retrieved_records": retrieved_records_text
     })
-    
+    return final_output
+
+### 2. 헬스케어 스펙 계산 관련 코드 ###
+class HealthInput(BaseModel):
+    user_id: str
+    gender: str
+    chronic: str = ""
+    height: float = None
+    weight: float = None
+    muscle_mass: float = None
+    body_fat: float = None
+    pushups: int = None
+    situps: int = None
+    running_pace: float = None
+    running_time: float = None
+    squat: float = None
+    bench_press: float = None
+    deadlift: float = None
+
+stats_prompt_str = """
+너의 역할은 게임기반 헬스케어 서비스를 관리하는 시스템이야
+기능은 신체 스펙 데이터와 운동 수행능력 데이터를 받아서 스펙으로 반환해줄거야 
+데이터 형식은 다음과 같아
+입력 데이터는 
+{{
+  "user_id": "12345",
+  "gender" : "male",
+  "chronic" : "척추 측만증",
+  "height": 175,
+  "weight": 70,
+  "muscle_mass": 35,
+  "body_fat": 18,
+  "pushups": 40,
+  "situps": 50,
+  "running_pace": 5.0,
+  "running_time": 30,
+  "squat": 100,
+  "bench_press": 80,
+  "deadlift": 120
+}}
+형식의 JSON 파일이고
+
+입력된 정보들을 가지고 스탯을 계산해줘
+strength: 스쿼트, 벤치프레스, 데드리프트 무게를 기반으로 계산, 높은 무게를 들수록 높은 점수를 얻습니다.
+
+endurance: 팔굽혀펴기, 윗몸일으키기 횟수를 기반으로 계산 많은 횟수를 할수록 높은 점수를 얻습니다.
+
+speed: 달리기 페이스를 기반으로 계산 페이스가 빠를수록 높은 점수를 얻습니다.
+
+stamina: 달리기 시간을 기반으로 계산되었습니다. 오래 달릴수록 높은 점수를 얻습니다. 또한 endurance점수와 speed점수를 합산하여 반영합니다.
+
+character_type: strength, endurance, speed, flexibility, stamina 점수를 종합적으로 고려하여 판단 (높다는 기준은 다른 스탯 평균보다 20%이상 수치를 가질때)
+{{
+runner	러닝 페이스 & 유지 시간이 높음
+power    근력이 높음
+diet 	체지방률이 높아 유산소를 주로 수행해야 하는 체형
+balance	전반적인 운동 능력이 균등하게 분포되어있음
+endurance	팔굽혀펴기 & 윗몸일으키기 반복 횟수가 많음
+}}
+
+입력 데이터의 성별이 "male"일때 각 요소의 평균 값들은 다음과 같아
+{{
+  "user_id": "12345",
+  "gender" : "male",
+  "chronic" : "",
+  "height": 175,
+  "weight": 70,
+  "muscle_mass": 33,
+  "body_fat": 25,
+  "pushups": 40,
+  "situps": 50,
+  "running_pace": 4.0,
+  "running_time": 30,
+  "squat": 60,
+  "bench_press": 60,
+  "deadlift": 60
+}}
+
+입력 데이터의 성별이 "female"일때 각 요소의 평균 값들은 다음과 같아.
+{{
+  "user_id": "12345",
+  "gender" : "female",
+  "chronic" : "",
+  "height": 166,
+  "weight": 60,
+  "muscle_mass": 25,
+  "body_fat": 35,
+  "pushups": 10,
+  "situps": 30,
+  "running_pace": 3.5,
+  "running_time": 30,
+  "squat": 40,
+  "bench_press": 40,
+  "deadlift": 40
+}}
+
+만약 입력이 들어올 때 값이 없는 항목이 있으면 내가 준 gender 별 기준값으로 채워서 사용해줘
+출력형식은 다음과 같아
+{{
+  "user_id": "12345",
+  "chronic" : "척추 측만증",
+  "strength": <strength>,
+  "endurance": <endurance>,
+  "speed": <speed>,
+  "stamina": <stamina>,
+  "character_type": "power"
+}}
+모든 출력은 JSON만 반환해줘
+"""
+
+stats_prompt_template = PromptTemplate(
+    input_variables=["input_data"],
+    template=stats_prompt_str,
+)
+
+stats_llm_chain = LLMChain(llm=llm, prompt=stats_prompt_template)
+
+@app.post("/stats")
+async def compute_stats(input_data: HealthInput):
+    final_output = stats_llm_chain.run({
+        "input_data": str(input_data.dict())
+    })
     return final_output
