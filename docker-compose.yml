@@ -15,5 +15,5 @@ services:
   
 networks:
   fitup-network:
+    external: true
     name: fitup-network
-    driver: bridge
