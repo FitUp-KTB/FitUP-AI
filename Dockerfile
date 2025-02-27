@@ -8,11 +8,11 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# 애플리케이션 코드 전체 복사 (Rag.py 포함)
+# 애플리케이션 코드 전체 복사 (geminirag.py 포함)
 COPY . .
 
 # 기본 포트 8000 노출
 EXPOSE 8000
 
-# Uvicorn을 이용해 FastAPI 서버 실행 (Rag.py의 app 인스턴스)
-CMD ["uvicorn", "Rag:app", "--host", "0.0.0.0", "--port", "8000"]
+# Uvicorn을 이용해 FastAPI 서버 실행 (geminirag.py의 app 인스턴스)
+CMD ["uvicorn", "geminirag:app", "--host", "0.0.0.0", "--port", "8000"]
