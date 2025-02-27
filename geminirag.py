@@ -3,6 +3,7 @@ from pydantic import BaseModel
 import os
 import google.generativeai as genai
 from dotenv import load_dotenv
+import numpy as np
 
 load_dotenv()
 
@@ -10,6 +11,114 @@ load_dotenv()
 genai.configure(api_key=os.getenv("GOOGLE_GEMINI_API_KEY"))
 
 app = FastAPI()
+
+reference_texts = [
+    # 하체 운동
+    "스쿼트 80kg 5세트 수행"
+    "레그프레스 100kg 5세트 수행"
+    "레그 익스텐션 50kg 5세트 수행"
+    "레그 컬 40kg 5세트 수행"
+    "힙 쓰러스트 60kg 5세트 수행"
+    "런지 15회 수행"
+    "스텝업 12회 수행"
+    "카프 레이즈 20회 수행"
+    "스미스 머신 스쿼트 70kg 5세트 수행"
+    "프론트 스쿼트 60kg 5세트 수행"
+    "바벨 힙 스러스트 80kg 5세트 수행"
+    "단일 다리 데드리프트 15회 수행"
+    "사이드 런지 12회 수행"
+    "드롭 스쿼트 10회 수행"
+    "글루트 브릿지 15회 수행"
+    
+    # 상체 운동
+    "벤치 프레스 60kg 5세트 수행"
+    "푸시업 15회 수행"
+    "덤벨 숄더 프레스 20kg 5세트 수행"
+    "랫 풀다운 50kg 5세트 수행"
+    "딥스 10회 수행"
+    "덤벨 플라이 15회 수행"
+    "바벨 로우 60kg 5세트 수행"
+    "덤벨 컬 15회 수행"
+    "트라이셉스 익스텐션 15회 수행"
+    "체스트 프레스 60kg 5세트 수행"
+    "케이블 로우 50kg 5세트 수행"
+    "푸시 프레스 50kg 5세트 수행"
+    "플랫 벤치 덤벨 프레스 15회 수행"
+    "오버헤드 덤벨 트라이셉스 익스텐션 15회 수행"
+    "덤벨 스컬크러셔 15회 수행"
+    "페이스 풀 15회 수행"
+    
+    # 복근 운동
+    "윗몸 일으키기 20회 수행"
+    "플랭크 60초 유지"
+    "사이드 플랭크 30초 유지"
+    "러시안 트위스트 15회 수행"
+    "레그 레이즈 15회 수행"
+    "버피 10회 수행"
+    "마운틴 클라이머 30초 수행"
+    "크런치 20회 수행"
+    "힙 레이즈 15회 수행"
+    "바이시클 크런치 20회 수행"
+    "플랭크 롤아웃 10회 수행"
+    "앱 휠 롤아웃 10회 수행"
+    "스위스 볼 크런치 15회 수행"
+    "줄넘기 5분 수행"
+    "탑 핀 크런치 15회 수행"
+    
+    # 유산소 운동
+    "30분 조깅"
+    "자전거 타기 1시간"
+    "수영 30분"
+    "스텝퍼 20분"
+    "엘리프티컬 30분"
+    "줄넘기 10분"
+    "하이킹 1시간"
+    "댄스 30분"
+    "킥복싱 30분"
+    "스피닝 45분"
+    "트레드밀 인터벌 30분"
+    "사이클링 1시간"
+    "체조 30분"
+    "배드민턴 1시간"
+    "웨이트 트레이닝 30분"
+    "크로스핏 30분"
+    
+    # 기타 운동
+    "스트레칭 15분"
+    "요가 30분"
+    "필라테스 30분"
+    "바이크 30분"
+    "체중 운동 20분"
+    "균형 훈련 15분"
+    "코어 운동 20분"
+    "명상 10분"
+    "저항 밴드 운동 20분"
+    "스텝 운동 15분"
+    "디스크 훈련 15분"
+    "스포츠 마사지 30분"
+    "발목 강화 운동 15회 수행"
+    "골반 기울이기 운동 15회 수행"
+    "넓은 스쿼트 15회 수행"
+    "하체 스트레칭 10분 수행"
+]
+
+embedding_model = genai.GenerativeModel("models/embedding-001")
+
+def get_embedding(text):
+    """텍스트를 임베딩 벡터로 변환"""
+    response = embedding_model.generate_content(text)
+    return np.array(response.text.split(","), dtype=float)  # 임베딩 값이 ','로 구분된다고 가정
+
+def find_most_relevant_text(query, reference_texts):
+    """입력된 텍스트와 가장 유사한 기존 텍스트 검색"""
+    query_embedding = get_embedding(query)
+    reference_embeddings = [get_embedding(text) for text in reference_texts]
+
+    similarities = [np.dot(query_embedding, ref_emb) / (np.linalg.norm(query_embedding) * np.linalg.norm(ref_emb))
+                    for ref_emb in reference_embeddings]
+    
+    best_match_index = np.argmax(similarities)
+    return reference_texts[best_match_index], similarities[best_match_index]
 
 ### 1. 퀘스트 생성 관련 코드 ###
 class QuestInput(BaseModel):
@@ -42,6 +151,7 @@ quest_prompt_template = """
    - 목표에 맞는 식단이나 생활습관 등 관련 퀘스트를 생성할 것.
    - 오직 goal과 검색된 기존 기록에 영향을 받아 구성할 것.
 2. daily_quests의 fitness:
+   - 총 3개 퀘스트 생성하기
    - 입력 데이터의 main_category, sub_category, user_request, goal, stats, gender, chronic을 반영하여 운동 종목과 난이도를 조정할 것.
    - 운동 종목은 최대한 세부적으로 선정하고, 세트 운동인 경우 "몇개 몇세트" 형식으로 명시할 것.
    - 만약 chronic 값이 주어지면, 해당 질환(예: 척추 측만증)에 따라 운동 강도나 종목 선택을 조정할 것.
@@ -76,7 +186,7 @@ async def query_endpoint(input_data: QuestInput):
         quest_prompt_template.format(
             input_data=input_data.dict(),
             user_request=input_data.user_request,
-            retrieved_records="(추후 데이터베이스 연동 예정)"
+            retrieved_records=reference_texts
         )
     )
     return response.text
