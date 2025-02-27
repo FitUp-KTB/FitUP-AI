@@ -1,6 +1,6 @@
 fastapi
 uvicorn
 python-dotenv
-langchain
+langchain>=0.1.0
 faiss-cpu    # GPU를 사용한다면 faiss-gpu로 변경
 openai
