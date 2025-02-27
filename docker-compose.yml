@@ -10,3 +10,9 @@ services:
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - GOOGLE_GEMINI_API_KEY=${GOOGLE_GEMINI_API_KEY}
     restart: always
+    networks:
+      - my-network
+  
+networks:
+  my-network:
+    driver: bridge
