@@ -24,16 +24,23 @@ jobs:
 
   deploy:
     name: Deploy with Docker Compose (CD)
-    runs-on: self-hosted
     needs: build_and_push
+    strategy:
+      matrix:
+        runner_label:
+          - server1
+          - server2
+    runs-on:
+      - self-hosted
+      - '${{ matrix.runner_label }}'
     env:
       DOCKER_HUB_USERNAME: ${{ secrets.DOCKER_HUB_USERNAME }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
-      
+
       - name: Stop and remove old containers
-        run: docker-compose down
+        run: docker-compose down || true
 
       - name: Remove unused Docker images
         run: docker image prune -f
