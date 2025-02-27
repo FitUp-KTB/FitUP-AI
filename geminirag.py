@@ -232,13 +232,13 @@ stats_prompt_template = """
 형식의 JSON 파일이고
 
 입력된 정보들을 가지고 스탯을 계산해줘
-strength: 스쿼트, 벤치프레스, 데드리프트 무게를 기반으로 계산, 높은 무게를 들수록 높은 점수를 얻습니다.
+strength: 스쿼트, 벤치프레스, 데드리프트 무게를 기반으로 계산, 높은 무게를 들수록 높은 점수를 얻습니다. 
 
-endurance: 팔굽혀펴기, 윗몸일으키기 횟수를 기반으로 계산 많은 횟수를 할수록 높은 점수를 얻습니다.
+endurance: 팔굽혀펴기, 윗몸일으키기 횟수를 기반으로 계산 많은 횟수를 할수록 높은 점수를 얻습니다. 
 
-speed: 달리기 페이스를 기반으로 계산 페이스가 빠를수록 높은 점수를 얻습니다.
+speed: 달리기 페이스를 기반으로 숫자가 낮을수록 높은 점수를 얻습니다. 
 
-stamina: 달리기 시간을 기반으로 계산되었습니다. 오래 달릴수록 높은 점수를 얻습니다. 또한 endurance점수와 speed점수를 합산하여 반영합니다.
+stamina: 달리기 시간을 기반으로 계산되었습니다. 오래 달릴수록 높은 점수를 얻습니다. 또한 endurance점수와 speed점수를 합산하여 반영합니다. 
 
 character_type: strength, endurance, speed, flexibility, stamina 점수를 종합적으로 고려하여 판단 (높다는 기준은 다른 스탯 평균보다 20%이상 수치를 가질때)
 {{
@@ -249,7 +249,7 @@ balance	전반적인 운동 능력이 균등하게 분포되어있음
 endurance	팔굽혀펴기 & 윗몸일으키기 반복 횟수가 많음
 }}
 
-입력 데이터의 성별이 "male"일때 각 요소의 평균 값들은 다음과 같아
+입력 데이터의 성별이 "male"일때 각각의 모든 스탯이 50인 기준 값들은 다음과 같아.
 {{
   "user_id": "12345",
   "gender" : "male",
@@ -265,9 +265,9 @@ endurance	팔굽혀펴기 & 윗몸일으키기 반복 횟수가 많음
   "squat": 60,
   "bench_press": 60,
   "deadlift": 60
-}}
+}} 
 
-입력 데이터의 성별이 "female"일때 각 요소의 평균 값들은 다음과 같아.
+입력 데이터의 성별이 "female"일때 각각의 모든 스탯이 50인 기준 값들은 다음과 같아.
 {{
   "user_id": "12345",
   "gender" : "female",
@@ -283,7 +283,7 @@ endurance	팔굽혀펴기 & 윗몸일으키기 반복 횟수가 많음
   "squat": 40,
   "bench_press": 40,
   "deadlift": 40
-}}
+}} 
 
 만약 입력이 들어올 때 값이 없는 항목이 있으면 내가 준 gender 별 기준값으로 채워서 사용해줘
 출력형식은 다음과 같아
@@ -296,13 +296,13 @@ endurance	팔굽혀펴기 & 윗몸일으키기 반복 횟수가 많음
   "stamina": <stamina>,
   "character_type": "power"
 }}
-모든 출력은 JSON만 반환해줘
+설명이나 추가 내용 없이 출력형식의 JSON만 반환
 """
 
 
 @app.post("/stats")
 async def compute_stats(input_data: HealthInput):
-    model = genai.GenerativeModel("gemini-pro")
+    model = genai.GenerativeModel("gemini-1.5-flash")
     response = model.generate_content(
         stats_prompt_template.format(input_data=input_data.dict())
     )
