@@ -44,9 +44,9 @@ jobs:
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1.0.3
         with:
-          host: ${{ secrets.FASTAPI_SSH_HOST }}
-          username: ${{ secrets.FASTAPI_SSH_USER }}
-          key: ${{ secrets.FASTAPI_SSH_PRIVATE_KEY }}
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
             if [[ "${GITHUB_REF##*/}" == "main" ]]; then
               IMAGE_NAME=${{ secrets.DOCKER_HUB_USERNAME }}/fitup-ai
