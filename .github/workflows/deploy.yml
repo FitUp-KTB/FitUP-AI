@@ -4,51 +4,82 @@ on:
   push:
     branches:
       - main
+      - dev
+      - cicd/jump*
 
 jobs:
-  build_and_push:
-    name: Build and Push Docker Image (CI)
-    runs-on: self-hosted
+  build-and-push:
+    name: Build and Push Docker Image
+    runs-on: ubuntu-latest
+    environment: ${{ github.ref == 'refs/heads/main' && 'prod' || 'dev' }}
+
     steps:
-      - name: Checkout repository
+      - name: Checkout Repository
         uses: actions/checkout@v3
-      
+
+      - name: Set IMAGE_NAME
+        id: set-image
+        run: |
+          if [[ "${GITHUB_REF##*/}" == "main" ]]; then
+            echo "IMAGE_NAME=${{ secrets.DOCKER_HUB_USERNAME }}/fitup-ai" >> $GITHUB_ENV
+          else
+            echo "IMAGE_NAME=${{ secrets.DOCKER_HUB_USERNAME }}/fitup-ai-dev" >> $GITHUB_ENV
+          fi
+
       - name: Log in to Docker Hub
         run: echo "${{ secrets.DOCKER_HUB_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_HUB_USERNAME }}" --password-stdin
-      
+
       - name: Build Docker image
-        run: docker build -t ${{ secrets.DOCKER_HUB_USERNAME }}/fastapi-rag:latest .
-      
+        run: docker build -t $IMAGE_NAME:latest .
+
       - name: Push Docker image
-        run: docker push ${{ secrets.DOCKER_HUB_USERNAME }}/fastapi-rag:latest
+        run: docker push $IMAGE_NAME:latest
 
   deploy:
-    name: Deploy with Docker Compose (CD)
-    needs: build_and_push
-    strategy:
-      matrix:
-        runner_label:
-          - server1
-          - server2
-    runs-on:
-      - self-hosted
-      - '${{ matrix.runner_label }}'
-    env:
-      DOCKER_HUB_USERNAME: ${{ secrets.DOCKER_HUB_USERNAME }}
+    name: Deploy to Remote Server via SSH
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    environment: ${{ github.ref == 'refs/heads/main' && 'prod' || 'dev' }}
+
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
-
-      - name: Stop and remove old containers
-        run: docker-compose down || true
-
-      - name: Remove unused Docker images
-        run: docker image prune -f
-
-      - name: Deploy with Docker Compose
-        env:
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          GOOGLE_GEMINI_API_KEY: ${{ secrets.GOOGLE_GEMINI_API_KEY }}
+      - name: Deploy to Remote Server via Jump Server
         run: |
-          docker-compose pull
-          docker-compose up -d
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_JUMP_KEY }}" > ~/.ssh/jump_key
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/private_vm_key
+          chmod 600 ~/.ssh/jump_key ~/.ssh/private_vm_key
+
+          # 브랜치에 따라 이미지/컨테이너 이름 설정
+          if [[ "${GITHUB_REF##*/}" == "main" ]]; then
+            IMAGE_NAME="${{ secrets.DOCKER_HUB_USERNAME }}/fitup-ai"
+            CONTAINER_NAME="fitup-ai"
+          else
+            IMAGE_NAME="${{ secrets.DOCKER_HUB_USERNAME }}/fitup-ai-dev"
+            CONTAINER_NAME="fitup-ai-dev"
+          fi
+
+          ssh \
+            -o StrictHostKeyChecking=no \
+            -o UserKnownHostsFile=/dev/null \
+            -o ProxyCommand="ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i ~/.ssh/jump_key -W %h:%p ${{ secrets.SSH_JUMP_USER }}@${{ secrets.SSH_JUMP_HOST }}" \
+            -i ~/.ssh/private_vm_key \
+            ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} << EOF
+
+            set -e
+
+            docker login -u ${{ secrets.DOCKER_HUB_USERNAME }} -p ${{ secrets.DOCKER_HUB_PASSWORD }}
+            docker pull $IMAGE_NAME:latest
+
+            docker stop $CONTAINER_NAME || true
+            docker rm $CONTAINER_NAME || true
+
+            docker run -d \
+              --name $CONTAINER_NAME \
+              --restart unless-stopped \
+              -p 8000:8000 \
+              -e OPENAI_API_KEY="${{ secrets.OPENAI_API_KEY }}" \
+              -e GOOGLE_GEMINI_API_KEY="${{ secrets.GOOGLE_GEMINI_API_KEY }}" \
+              $IMAGE_NAME:latest
+
+            docker image prune -af
+          EOF
