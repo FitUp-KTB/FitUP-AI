@@ -1,2 +1,24 @@
-__pycache__
+# Python cache
+__pycache__/
+*.py[cod]
+
+# VSCode settings
+.vscode/
+
+# 환경 설정 파일
 .env
+
+# Mac OS 파일
+.DS_Store
+
+# Jupyter Notebook 체크포인트
+.ipynb_checkpoints/
+
+# DB, 개인 인증 파일 등 민감한 폴더
+aiven_ca/
+chroma_db/
+DB/
+
+# 기타 로그/임시 파일
+*.log
+*.sqlite3
