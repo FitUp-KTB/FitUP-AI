@@ -5,6 +5,7 @@ on:
     branches:
       - main
       - dev
+      - cicd/jump*
 
 jobs:
   build-and-push:
@@ -29,10 +30,10 @@ jobs:
         run: echo "${{ secrets.DOCKER_HUB_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_HUB_USERNAME }}" --password-stdin
 
       - name: Build Docker image
-        run: docker build -t $IMAGE_NAME:${{ github.ref_name }} .
+        run: docker build -t $IMAGE_NAME:latest .
 
       - name: Push Docker image
-        run: docker push $IMAGE_NAME:${{ github.ref_name }}
+        run: docker push $IMAGE_NAME:latest
 
   deploy:
     name: Deploy to Remote Server via SSH
@@ -41,34 +42,44 @@ jobs:
     environment: ${{ github.ref == 'refs/heads/main' && 'prod' || 'dev' }}
 
     steps:
-      - name: Deploy via SSH
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USER }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          script: |
-            if [[ "${GITHUB_REF##*/}" == "main" ]]; then
-              IMAGE_NAME=${{ secrets.DOCKER_HUB_USERNAME }}/fitup-ai
-              CONTAINER_NAME=fitup-ai
-            else
-              IMAGE_NAME=${{ secrets.DOCKER_HUB_USERNAME }}/fitup-ai-dev
-              CONTAINER_NAME=fitup-ai-dev
-            fi
+      - name: Deploy to Remote Server via Jump Server
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_JUMP_KEY }}" > ~/.ssh/jump_key
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/private_vm_key
+          chmod 600 ~/.ssh/jump_key ~/.ssh/private_vm_key
+
+          # 브랜치에 따라 이미지/컨테이너 이름 설정
+          if [[ "${GITHUB_REF##*/}" == "main" ]]; then
+            IMAGE_NAME="${{ secrets.DOCKER_HUB_USERNAME }}/fitup-ai"
+            CONTAINER_NAME="fitup-ai"
+          else
+            IMAGE_NAME="${{ secrets.DOCKER_HUB_USERNAME }}/fitup-ai-dev"
+            CONTAINER_NAME="fitup-ai-dev"
+          fi
+
+          ssh \
+            -o StrictHostKeyChecking=no \
+            -o UserKnownHostsFile=/dev/null \
+            -o ProxyCommand="ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i ~/.ssh/jump_key -W %h:%p ${{ secrets.SSH_JUMP_USER }}@${{ secrets.SSH_JUMP_HOST }}" \
+            -i ~/.ssh/private_vm_key \
+            ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} << EOF
+
+            set -e
 
             docker login -u ${{ secrets.DOCKER_HUB_USERNAME }} -p ${{ secrets.DOCKER_HUB_PASSWORD }}
-            docker pull $IMAGE_NAME:${{ github.ref_name }}
+            docker pull $IMAGE_NAME:latest
 
-            # 기존 컨테이너 중지 및 삭제
             docker stop $CONTAINER_NAME || true
             docker rm $CONTAINER_NAME || true
 
-            # 컨테이너 실행
             docker run -d \
               --name $CONTAINER_NAME \
               --restart unless-stopped \
               -p 8000:8000 \
               -e OPENAI_API_KEY="${{ secrets.OPENAI_API_KEY }}" \
               -e GOOGLE_GEMINI_API_KEY="${{ secrets.GOOGLE_GEMINI_API_KEY }}" \
-              --network fitup-network \
-              $IMAGE_NAME:${{ github.ref_name }}
+              $IMAGE_NAME:latest
+
+            docker image prune -af
+          EOF
