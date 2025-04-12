@@ -10,6 +10,7 @@ class QuestInput(BaseModel):
     sub_category: str
     user_request: str
     goal: str
+    # spec: dict = {}  # ← 자동 계산용 스펙 정보
 
 # 퀘스트 항목 기본 구조
 # contents: 퀘스트 내용, points: 포인트

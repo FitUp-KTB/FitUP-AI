@@ -22,4 +22,4 @@ output_parser = JsonOutputParser(pydantic_object=QuestOutput)
 chain = quest_prompt | llm | output_parser
 
 def run_quest_chain(input_data: QuestInput) -> QuestOutput:
-    return chain.invoke({"input_data": input_data.model_dump()})
+    return chain.invoke(input_data.model_dump())
