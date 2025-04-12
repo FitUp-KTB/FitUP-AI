@@ -13,6 +13,8 @@ llm = ChatGoogleGenerativeAI(
 )
 
 output_parser = JsonOutputParser(pydantic_object=QuestOutput)
+# LLM이 생성한 JSON을 QuestOutput이라는 Pydantic 모델객체로 변환하는 파서를 정의
+
 
 chain = quest_prompt | llm | output_parser
 
