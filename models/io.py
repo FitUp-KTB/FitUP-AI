@@ -1,3 +1,9 @@
+<<<<<<< HEAD
+=======
+# LLM이 응답한 결과를 받아들이는 그릇
+# 데이터를 주고받기 위한 양식(form)
+
+>>>>>>> c4f41b2 (update)
 from pydantic import BaseModel, RootModel
 from typing import Dict
 
