@@ -1,24 +1,51 @@
 from fastapi import APIRouter, Body
 from DB.chroma_connector import load_chroma
-
-from langchain.llms import HuggingFaceHub
+from langchain_openai import ChatOpenAI
 from langchain.chains import RetrievalQA
+from langchain_huggingface import HuggingFaceEmbeddings
+from models.io import QuestInput
+from utils.rag_chain import generate_quest_with_rag
+from models.db_model import QuestLog
+from DB.postgres_connector import get_session
+from fastapi import HTTPException
+from fastapi.responses import JSONResponse
+from langchain_core.documents import Document
+import os
+import json
 
-router = APIRouter()
+router = APIRouter() 
+
+def format_prompt_with_user_info(
+    gender: str,
+    chronic: str,
+    stats: str,
+    main_category: str,
+    sub_category: str,
+    user_request: str,
+    goal: str
+) -> str:
+    return f"""
+당신은 건강 운동 상담 전문가입니다. 아래 사용자 정보를 기반으로 가장 적절한 운동 루틴을 추천해주세요.
+검색된 문서 내용을 기반으로만 판단하며, 사용자의 건강 상태와 목표를 고려한 맞춤형 피드백을 제공해주세요.
+
+[사용자 정보]
+- 성별: {gender}
+- 만성 질환: {chronic}
+- 체력 정보: {stats}
+- 메인 카테고리: {main_category}
+- 서브 카테고리: {sub_category}
+- 요청: {user_request}
+- 목표: {goal}
+
+출력 형식:
+1. 추천 운동 이름
+2. 이유 (사용자 정보 + 문서 기반)
+3. 주의 사항
+"""
 
 # 벡터 DB 로드 및 검색기 초기화
 retriever = load_chroma().as_retriever()
 
-# HuggingFace 기반 LLM 사용
-llm = HuggingFaceHub(repo_id="google/flan-t5-base", model_kwargs={"temperature": 0.5})
-
-# RAG 체인 생성
-rag_chain = RetrievalQA.from_chain_type(llm=llm, retriever=retriever)
-
-@router.post("/rag-search")
-def rag_search(prompt: str = Body(..., embed=True)):
-    response = rag_chain.run(prompt)
-    return {"query": prompt, "response": response}
 # OpenAI 기반 LLM 사용
 llm = ChatOpenAI(
     model="gpt-3.5-turbo",
