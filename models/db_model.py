@@ -11,10 +11,6 @@ class QuestLog(Base):
     goal = Column(String)
     main_category = Column(String)
     sub_category = Column(String)
-    quests = Column(JSON)  # 전체 퀘스트 JSON 저장
-
-### DB 초기화 및 테이블 생성(한번만 실행만 하면 됨)
-from DB.postgres_connector import engine
     quests = Column(JSON) # ← 여기가 핵심: daily_quests 전체 저장
 
 from DB.postgres_connector import engine 
