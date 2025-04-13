@@ -19,7 +19,7 @@ quest_output_parser = JsonOutputParser(pydantic_object=QuestOutput)
 # chain 연결 (LCEL)
 quest = quest_prompt | llm | quest_output_parser
 
-@app.post("/generate-quest"  """, response_model=QuestOutput""") #output parser를 지정했지만 한번더 검증하는 용도
+@app.post("/generate-quest") #output parser를 지정했지만 한번더 검증하는 용도
 async def generate_quest_endpoint(input_data: QuestInput):
     result = quest.invoke({
         "input_data": input_data.model_dump()  # QuestInput → dict
@@ -32,7 +32,7 @@ status_output_parser = JsonOutputParser(pydantic_object=StatOutput)
 
 status = status_prompt | llm | status_output_parser
 
-@app.post("/stats"   """, response_model = StatOutput""")
+@app.post("/stats")
 async def compute_stats(input_data: StatInput):
     result = status.invoke({
         'input_data': input_data.model_dump()
