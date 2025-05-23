@@ -1,6 +1,7 @@
 # FIT UP: LLM 기반 개인 맞춤 헬스케어 서비스
 
 <p align="center">
+<img src=https://github.com/user-attachments/assets/e43876c2-3f00-4ec1-82db-2958866bfaea>
 <img src=https://github.com/user-attachments/assets/725c2aa5-6dd5-4bf1-ba50-618857ec9f9b>
 </p>
 
